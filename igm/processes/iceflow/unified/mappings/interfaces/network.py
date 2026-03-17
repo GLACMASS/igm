@@ -26,15 +26,15 @@ class InterfaceNetwork(InterfaceMapping):
         Nz = int(cfg_numerics.Nz)
 
         if cfg_unified.network.pretrained:
-            if cfg_unified.network.old_format:
-                warnings.warn("Loading old format pretrained emulator. This may not be supported in future IGM versions.")
-                dir_path = get_pretrained_emulator_path(cfg, state)
-                iceflow_model = load_model_from_path(dir_path, cfg_unified.inputs)
-            else:
+            if "pretraining" in cfg.processes.keys():
                 dtype = normalize_precision(cfg_numerics.precision)
                 artifact_dir = cfg_unified.network.pretrained_path
                 tf.keras.mixed_precision.set_global_policy("float64" if tf.as_dtype(dtype) == tf.float64 else "float32")
                 iceflow_model, _manifest = load_emulator_artifact(artifact_dir, cfg)
+            else:
+                warnings.warn("Loading old format pretrained emulator. This may not be supported in future IGM versions.")
+                dir_path = get_pretrained_emulator_path(cfg, state)
+                iceflow_model = load_model_from_path(dir_path, cfg_unified.inputs)
         else:
             warnings.warn("No pretrained emulator selected. Starting from scratch.")
 
@@ -48,7 +48,7 @@ class InterfaceNetwork(InterfaceMapping):
             iceflow_model = Architectures[arch_name](cfg, nb_inputs, nb_outputs)
 
             # Build normalizer and attach to model
-            if cfg.processes.iceflow.do_pretraining:
+            if "pretraining" in cfg.processes.keys():        
                 iceflow_model.input_normalizer = None # this is handled in pretraining process
             else:
                 # Inference / non-pretraining: keep config-driven behavior for now

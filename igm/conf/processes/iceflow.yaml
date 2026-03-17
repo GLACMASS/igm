@@ -1,6 +1,5 @@
 iceflow:
   method: emulated
-  do_pretraining: false
   force_max_velbar: 0.0
   physics:
     energy_components: [viscosity, gravity, sliding]
@@ -102,6 +101,7 @@ iceflow:
     nbit_init: 1
     nbit_warmup: -1
     retrain_freq: 10
+    retrain_threshold: 1.0 # for now it corresponds to a z-score
     adam:
       lr: 2.0e-05
       lr_init: 0.0001
@@ -164,7 +164,6 @@ iceflow:
       pretrained: true
       pretrained_path: ""
       print_summary: false
-      old_format: false
       output_scale: 1.0
       architecture: CNN
     data_preparation:
