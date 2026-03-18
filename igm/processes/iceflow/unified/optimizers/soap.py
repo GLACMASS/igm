@@ -84,6 +84,7 @@ class OptimizerSOAP(Optimizer):
         precision:       ``'float32'`` or ``'float64'``.
         ord_grad_u:      Norm used for the velocity-gradient display metric.
         ord_grad_theta:  Norm used for the weight-gradient display metric.
+        batch_size:  Batch size.
     """
 
     def __init__(
@@ -103,6 +104,7 @@ class OptimizerSOAP(Optimizer):
         precond_freq: int = 10,
         damping: float = 1e-8,
         iter_max: int = int(1e5),
+        batch_size: int = 1,
         **kwargs,
     ):
         super().__init__(
@@ -124,6 +126,7 @@ class OptimizerSOAP(Optimizer):
         self.precond_freq = tf.constant(precond_freq, dtype=tf.int32)
         self.damping = tf.constant(damping, dtype=self.precision)
         self.iter_max = tf.Variable(iter_max, dtype=tf.int32)
+        self.batch_size = int(batch_size)
 
         # Layer states — allocated in minimize() before the tf.function
         self._layer_states: Optional[List[_SOAPLayerState]] = None
@@ -251,22 +254,18 @@ class OptimizerSOAP(Optimizer):
             m_hat = state.exp_avg / bc1
             v_hat = state.exp_avg_sq / bc2
             return self.lr * m_hat / (tf.sqrt(v_hat) + self.eps)
-
+        
     @tf.function(jit_compile=False)
     def minimize_impl(self, inputs: tf.Tensor) -> tf.Tensor:
-        first_batch = self.sampler(inputs)
-        n_batches = first_batch.shape[0]
+        B = self.batch_size
+        n_batches = tf.maximum([1], [inputs.shape[0] // B])[0]
 
-        if getattr(self.sampler, "dynamic_augmentation", False):
-            static_batches = None
-            dynamic_augmentation = True
-        else:
-            static_batches = first_batch
-            dynamic_augmentation = False
+        # Define batch before loops so AutoGraph can infer a consistent type
+        batch = inputs[0:B, :, :, :]
+        batch_shape = batch.shape
 
         theta = self.map.get_theta()
-        input = first_batch[0]
-        U, V = self.map.get_UV(input)
+        U, V = self.map.get_UV(batch)
         self._init_step_state(U, V, theta)
 
         halt_status = tf.constant(HaltStatus.CONTINUE.value, dtype=tf.int32)
@@ -274,35 +273,45 @@ class OptimizerSOAP(Optimizer):
         costs = tf.TensorArray(dtype=self.precision, size=int(self.iter_max))
 
         for iter in tf.range(self.iter_max):
-
-            if dynamic_augmentation:
-                batched_inputs = self.sampler(inputs)
-            else:
-                batched_inputs = static_batches
-
-            # Evaluated once per outer iteration using TF ops (iter is a Tensor
-            # inside tf.range, so Python % would fail inside @tf.function)
             should_update_eig = tf.equal(tf.math.floormod(iter, self.precond_freq), 0)
 
             cost_sum = tf.constant(0.0, dtype=self.precision)
+            grad_u_norm_sum = tf.constant(0.0, dtype=self.precision)
+            grad_theta_norm_sum = tf.constant(0.0, dtype=self.precision)
+
+            # Initialise accumulator with zeros matching each weight's shape
+            grad_theta_accum = [tf.zeros_like(w) for w in theta]
 
             for b in tf.range(n_batches):
-                input = batched_inputs[b]
-                cost, grad_u, grad_theta = self._get_grad(input)
+                batch = inputs[b * B : (b + 1) * B, :, :, :]
+                batch = tf.ensure_shape(batch, batch_shape)
 
-                for w, g, state in zip(theta, grad_theta, self._layer_states):
-                    w.assign_sub(self._soap_step(g, state, iter, should_update_eig))
+                cost, grad_u, grad_theta = self._get_grad(batch)
 
-                cost_sum = cost_sum + cost
+                grad_theta_accum = [a + g for a, g in zip(grad_theta_accum, grad_theta)]
 
-            cost_avg = cost_sum / n_batches
+                grad_u_norm, grad_theta_norm = self._get_grad_norm(grad_u, grad_theta)
+                cost_sum += cost
+                grad_u_norm_sum += grad_u_norm
+                grad_theta_norm_sum += grad_theta_norm
+
+            n_batches_f = tf.cast(n_batches, dtype=self.precision)
+            cost_avg = cost_sum / n_batches_f
+            grad_u_norm_avg = grad_u_norm_sum / n_batches_f
+            grad_theta_norm_avg = grad_theta_norm_sum / n_batches_f
+
+            # Apply averaged gradients once per iteration
+            for w, g_accum, state in zip(theta, grad_theta_accum, self._layer_states):
+                w.assign_sub(self._soap_step(g_accum / n_batches_f, state, iter, should_update_eig))
+
             costs = costs.write(iter, cost_avg)
 
-            U, V = self.map.get_UV(input)
-            grad_u_norm, grad_theta_norm = self._get_grad_norm(grad_u, grad_theta)
+            # Use first batch for UV update — consistent with init above
+            U, V = self.map.get_UV(inputs[0:B, :, :, :])
             self._update_step_state(
-                iter, U, V, theta, cost_avg, grad_u_norm, grad_theta_norm
+                iter, U, V, theta, cost_avg, grad_u_norm_avg, grad_theta_norm_avg
             )
+
             halt_status = self._check_stopping()
             self._update_display()
             self.map.on_step_end(iter)
