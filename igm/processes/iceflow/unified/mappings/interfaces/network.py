@@ -22,11 +22,11 @@ class InterfaceNetwork(InterfaceMapping):
     def get_mapping_args(cfg: DictConfig, state: State) -> Dict[str, Any]:
         cfg_numerics = cfg.processes.iceflow.numerics
         cfg_unified = cfg.processes.iceflow.unified
-            
+
         Nz = int(cfg_numerics.Nz)
 
         if cfg_unified.network.pretrained:
-            if "pretraining" in cfg.processes.keys():
+            if cfg_unified.network.pretrained_path:
                 dtype = normalize_precision(cfg_numerics.precision)
                 artifact_dir = cfg_unified.network.pretrained_path
                 tf.keras.mixed_precision.set_global_policy("float64" if tf.as_dtype(dtype) == tf.float64 else "float32")
