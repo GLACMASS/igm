@@ -25,6 +25,10 @@ physics:
         Type: float
         Description: "Weertman exponent."
         Units: dimless
+      u_ref:
+        Type: float
+        Description: "Reference velocity for the Weertman sliding law."
+        Units: m y^{-1}
     coulomb:
       regu:
         Type: float
@@ -34,6 +38,10 @@ physics:
         Type: float
         Description: "Coulomb exponent."
         Units: dimless
+      u_ref:
+        Type: float
+        Description: "Reference velocity for the Coulomb sliding law."
+        Units: m y^{-1}
       mu:
         Type: float
         Description: "Till coefficient."
@@ -46,6 +54,14 @@ physics:
       exponent:
         Type: float
         Description: "Budd exponent."
+        Units: dimless
+      u_ref:
+        Type: float
+        Description: "Reference velocity for the Budd sliding law."
+        Units: m y^{-1}
+      N_ref:
+        Type: float
+        Description: "Reference effective pressure for the Budd sliding law."
         Units: dimless 
   gravity_cst:
     Type: float
@@ -313,6 +329,24 @@ unified:
     Type: list
     Description: "List of the applied boundary conditions; the available bcs are: frozen_bed, periodic_ns, periodic_we, no_slip, periodic_ns_global, periodic_we_global, no_slip_global."
     Units: dimless
+  bc:
+    dirichlet:
+      left:
+        Type: float
+        Description: "Value enforced on the DOFs of the velocity at the left (west) border; note that this sets the degrees of freedom, not the velocity field itself."
+        Units: m y^{-1}
+      right:
+        Type: float
+        Description: "Value enforced on the DOFs of the velocity at the right (east) border; note that this sets the degrees of freedom, not the velocity field itself."
+        Units: m y^{-1}
+      top:
+        Type: float
+        Description: "Value enforced on the DOFs of the velocity at the top (north) border; note that this sets the degrees of freedom, not the velocity field itself."
+        Units: m y^{-1}
+      bottom:
+        Type: float
+        Description: "Value enforced on the DOFs of the velocity at the bottom (south) border; note that this sets the degrees of freedom, not the velocity field itself."
+        Units: m y^{-1}
   optimizer:
     Type: string
     Description: "Type of optimizer used to solve the ice flow."
@@ -332,6 +366,10 @@ unified:
   retrain_freq:
     Type: integer
     Description: "Frequency at which the ice flow is solved."
+    Units: dimless
+  retrain_threshold:
+    Type: float
+    Description: "Threshold (expressed as a z-score) above which the ice flow is re-solved."
     Units: dimless
   adam:
     lr:
@@ -362,6 +400,48 @@ unified:
     alpha_min:
       Type: float
       Description: "Minimal value for the step size in the line search."
+      Units: dimless
+  cg_newton:
+    cg_tol:
+      Type: float
+      Description: "Tolerance for the conjugate-gradient linear solver in the CG-Newton optimizer."
+      Units: dimless
+    cg_max_iter:
+      Type: integer
+      Description: "Maximum number of conjugate-gradient iterations in the CG-Newton optimizer."
+      Units: dimless
+    truncated:
+      Type: boolean
+      Description: "Use truncated (inexact) Newton steps in the CG-Newton optimizer."
+      Units: dimless
+    damping:
+      Type: float
+      Description: "Damping added to the Hessian diagonal for regularization in the CG-Newton optimizer."
+      Units: dimless
+  trust_region:
+    cg_max_iter:
+      Type: integer
+      Description: "Maximum number of conjugate-gradient iterations for the trust-region sub-problem."
+      Units: dimless
+    cg_tol:
+      Type: float
+      Description: "Tolerance for the conjugate-gradient linear solver in the trust-region optimizer."
+      Units: dimless
+    delta_init:
+      Type: float
+      Description: "Initial trust-region radius."
+      Units: dimless
+    delta_max:
+      Type: float
+      Description: "Maximum trust-region radius."
+      Units: dimless
+    eta:
+      Type: float
+      Description: "Minimum ratio of actual to predicted reduction for accepting a step in the trust-region optimizer."
+      Units: dimless
+    damping:
+      Type: float
+      Description: "Damping added to the Hessian diagonal for regularization in the trust-region optimizer."
       Units: dimless
   muon:
     lr:
@@ -494,6 +574,10 @@ unified:
     pretrained:
       Type: boolean
       Description: "Use a pretrained network instead of starting from scratch."
+      Units: dimless
+    pretrained_path:
+      Type: string
+      Description: "Path to the pretrained network; taken from the library if empty."
       Units: dimless
     print_summary:
       Type: boolean
