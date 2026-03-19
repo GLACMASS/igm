@@ -5,6 +5,7 @@ iceflow:
     energy_components: [viscosity, gravity, sliding]
     sliding:
       law: weertman
+      use_mask_gr: false
       weertman:
         regu: 1.0e-10
         exponent: 3.0

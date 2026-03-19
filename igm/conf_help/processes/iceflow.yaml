@@ -16,6 +16,10 @@ physics:
       Type: string
       Description: "Type of sliding law."
       Units: dimless
+    use_mask_gr:
+      Type: boolean
+      Description: "If True, zero out basal shear stress in floating areas."
+      Units: dimless
     weertman:
       regu:
         Type: float
