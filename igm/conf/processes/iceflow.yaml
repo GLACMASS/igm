@@ -103,6 +103,8 @@ iceflow:
     nbit_warmup: -1
     retrain_freq: 10
     retrain_threshold: 1.0 # for now it corresponds to a z-score
+    newton:
+      damping: 1e-6
     adam:
       lr: 2.0e-05
       lr_init: 0.0001

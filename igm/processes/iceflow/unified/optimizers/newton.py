@@ -11,6 +11,12 @@ from ..mappings import Mapping
 from ..halt import Halt, HaltStatus
 from .line_searches import LineSearches, ValueAndGradient
 
+tf.config.optimizer.set_experimental_options(
+    {
+        "disable_meta_optimizer": True,
+    }
+)
+
 
 class OptimizerNewton(Optimizer):
     def __init__(
@@ -27,6 +33,7 @@ class OptimizerNewton(Optimizer):
         alpha_min: float = 0.0,
         iter_max: int = 100,
         damping: float = 1e-4,
+        batch_size: int = 1,
         **kwargs,
     ):
         super().__init__(
@@ -45,6 +52,7 @@ class OptimizerNewton(Optimizer):
         self.iter_max = tf.Variable(iter_max, dtype=tf.int32)
         self.alpha_min = tf.Variable(alpha_min, dtype=self.precision)
         self.damping = damping
+        self.batch_size = batch_size
 
     def update_parameters(self, iter_max: int, damping: float) -> None:
         self.iter_max.assign(iter_max)
@@ -118,7 +126,7 @@ class OptimizerNewton(Optimizer):
             grads = inner_tape.gradient(cost, [U, V] + theta)
             grad_u = tuple(grads[:2])
             grad_theta = grads[2:]
-            
+
             # ! Flattening here (on network mapping) causes an incredibly complex graph and memory leaks... (despite it being the cleanest...)
             grad_theta_flat = tf.concat(
                 [tf.reshape(g, (-1,)) for g in grad_theta], axis=0
@@ -128,6 +136,7 @@ class OptimizerNewton(Optimizer):
         h_blocks_theta = outer_tape.jacobian(
             target=grad_theta_flat,  # jacobian needs a flat tensor and not a list (compared to gradient)
             sources=theta,
+            experimental_use_pfor=False,
         )
 
         # Full Hessian
@@ -173,19 +182,8 @@ class OptimizerNewton(Optimizer):
 
     @tf.function(jit_compile=False)
     def minimize_impl(self, inputs: tf.Tensor) -> tf.Tensor:
-        first_batch = self.sampler(inputs)
-        n_batches = first_batch.shape[0]
-        if n_batches != 1:
-            raise NotImplementedError("❌ Hessian optimizer requires a single batch.")
 
-        if getattr(self.sampler, "dynamic_augmentation", False):
-            static_batches = None
-            dynamic_augmentation = True
-        else:
-            static_batches = first_batch
-            dynamic_augmentation = False
-
-        input = first_batch[0, :, :, :, :]
+        input = inputs[0:1, :, :, :]
 
         theta_flat = self.map.flatten_theta(self.map.get_theta())
 
@@ -199,11 +197,7 @@ class OptimizerNewton(Optimizer):
 
         for iter in tf.range(self.iter_max):
 
-            if dynamic_augmentation:
-                next_batch = self.sampler(inputs)
-            else:
-                next_batch = static_batches
-            input = next_batch[0, :, :, :, :]
+            input = inputs[0:1, :, :, :]
 
             cost, h_mat, grad_u, grad_theta = self._get_grads_and_hessian(input)
 

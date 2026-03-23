@@ -30,7 +30,6 @@ class InterfaceCGNewton(InterfaceOptimizer):
             "map": map,
             "halt": halt,
             "iter_max": cfg_unified.nbit,
-            "damping": cfg_unified.hessian.damping,
             "print_cost": cfg_unified.display.print_cost,
             "print_cost_freq": cfg_unified.display.print_cost_freq,
             "precision": cfg_numerics.precision,
