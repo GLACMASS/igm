@@ -33,6 +33,7 @@ def get_status(
     elif retrain_freq > 0 and state.it > 0 and state.it % retrain_freq == 0:
         return Status.DEFAULT
     elif state.it > 0 and distribution_shifted:
+        print("Retraining due to distribution shift!") # temporary measure to make debugging more clear for users
         return Status.DEFAULT
     # elif state.it > 0 and cfg_unified.mapping == "identity": # in theory, we might want to require solving at each time step for identity
     # return Status.DEFAULT
