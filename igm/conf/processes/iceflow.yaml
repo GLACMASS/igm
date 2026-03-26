@@ -102,7 +102,7 @@ iceflow:
     nbit_init: 1
     nbit_warmup: -1
     retrain_freq: 10
-    retrain_threshold: 4.0 # for now it corresponds to a z-score (4 is default as its quite high and will default to the retrain_freq most likely)
+    retrain_threshold: 1.0e+10 # for now it corresponds to a z-score (1.0e+10 is default as its quite high and will default to the retrain_freq most likely)
     newton:
       damping: 1e-6
     adam:
