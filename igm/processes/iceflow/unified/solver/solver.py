@@ -12,6 +12,7 @@ from igm.processes.iceflow.utils.data_preprocessing import (
     fieldin_state_to_X,
     split_field_into_patches,
 )
+from igm.utils.math.precision import normalize_precision
 
 from ..mappings.normalizer import is_distribution_shifted
 
@@ -33,7 +34,9 @@ def get_status(
     elif retrain_freq > 0 and state.it > 0 and state.it % retrain_freq == 0:
         return Status.DEFAULT
     elif state.it > 0 and distribution_shifted:
-        print("Retraining due to distribution shift!") # temporary measure to make debugging more clear for users
+        print(
+            "Retraining due to distribution shift!"
+        )  # temporary measure to make debugging more clear for users
         return Status.DEFAULT
     # elif state.it > 0 and cfg_unified.mapping == "identity": # in theory, we might want to require solving at each time step for identity
     # return Status.DEFAULT
@@ -45,7 +48,8 @@ def get_solver_inputs_from_state(cfg: DictConfig, state: State) -> tf.Tensor:
     """Returns [N, ly, lx, C] non-overlapping patches, same strategy as emulated approach."""
     X = fieldin_state_to_X(cfg, state)
     framesizemax = cfg.processes.iceflow.unified.data_preparation.framesizemax
-    return split_field_into_patches(X, framesizemax)
+    dtype = normalize_precision(cfg.processes.iceflow.numerics.precision)
+    return tf.cast(split_field_into_patches(X, framesizemax), dtype)
 
 
 def should_normalize(cfg: DictConfig) -> bool:
